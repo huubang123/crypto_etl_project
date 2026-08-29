@@ -1,15 +1,25 @@
 import os
 import logging
+import time
 from typing import List, Optional
 import requests
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
 class CoinGeckoExtractor:
-    def __init__(self, api_key : Optional[str] = None, base_url : Optional[str] = None):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        max_retries: int = 3,
+        backoff_seconds: float = 1.0,
+    ):
             self.api_key = api_key or os.getenv("COINGECKO_API_KEY")
-            self.base_url = base_url or os.getenv("COINGECKO_BASE_URL","https://api.coingecko.com/api/v3")
+            self.base_url = base_url or os.getenv("COINGECKO_BASE_URL", "https://api.coingecko.com/api/v3")
+            self.max_retries = max_retries
+            self.backoff_seconds = backoff_seconds
 
             self.session = requests.Session()
             self.session.headers.update({
@@ -20,6 +30,15 @@ class CoinGeckoExtractor:
                 self.session.headers.update({
                     "x-cg-demo-api-key": self.api_key
                 })
+
+    @staticmethod
+    def _is_retryable_error(error: requests.exceptions.RequestException) -> bool:
+        if not isinstance(error, requests.exceptions.HTTPError):
+            return True
+
+        status_code = error.response.status_code if error.response is not None else None
+        return status_code == 429 or (status_code is not None and 500 <= status_code < 600)
+
     def fetch_market_data(
         self
         ,vs_currency : str = "usd"
@@ -41,24 +60,38 @@ class CoinGeckoExtractor:
         if coin_ids:
             params["ids"] = ",".join(coin_ids)
 
-        try:
-            logger.info("Requesting data from CoinGecko API...")
-            response = self.session.get(endpoint, params=params, timeout=30)
-            response.raise_for_status()
+        for attempt in range(self.max_retries + 1):
+            try:
+                logger.info("Requesting data from CoinGecko API...")
+                response = self.session.get(endpoint, params=params, timeout=30)
+                response.raise_for_status()
 
-            data = response.json()
+                data = response.json()
 
-            if not isinstance(data , list):
-                raise ValueError("Expected API response to be a list of records.")
-            
-            logger.info("Successfully fetched %s records from API.",len(data))
-            return data
-        except requests.exceptions.RequestException as e:
-            logger.error("API request failed: %s", e)
-            raise
-        except ValueError as e:
-            logger.error("Invalid API response format: %s", e)
-            raise
+                if not isinstance(data, list):
+                    raise ValueError("Expected API response to be a list of records.")
+
+                logger.info("Successfully fetched %s records from API.", len(data))
+                return data
+            except requests.exceptions.RequestException as error:
+                if not self._is_retryable_error(error) or attempt == self.max_retries:
+                    logger.error("API request failed: %s", error)
+                    raise
+
+                delay = self.backoff_seconds * (2 ** attempt)
+                logger.warning(
+                    "CoinGecko request failed (%s). Retrying in %s seconds (attempt %s/%s).",
+                    error,
+                    delay,
+                    attempt + 1,
+                    self.max_retries,
+                )
+                time.sleep(delay)
+            except ValueError as error:
+                logger.error("Invalid API response format: %s", error)
+                raise
+
+        raise RuntimeError("CoinGecko retry loop ended unexpectedly.")
     @staticmethod
     def json_to_dataframe(data:list) ->pd.DataFrame:
         if not data:

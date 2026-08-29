@@ -22,12 +22,15 @@ def load_to_postgres(df: pd.DataFrame, engine):
         "last_updated": "source_updated_at"
     }).to_dict(orient="records")
 
+    inserted_rows = 0
+
     with engine.begin() as conn:
         for record in records:
             stmt = insert(table).values(**record)
             stmt = stmt.on_conflict_do_nothing(
                 index_elements=["coin_id", "source_updated_at"]
             )
-            conn.execute(stmt)
+            result = conn.execute(stmt)
+            inserted_rows += result.rowcount
 
-    logger.info("Loaded %s rows into PostgreSQL.", len(records))
+    logger.info("Inserted %s rows into PostgreSQL.", inserted_rows)

@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS crypto.crypto_market_snapshot (
     high_24h NUMERIC,
     low_24h NUMERIC,
     price_change_percentage_24h NUMERIC,
-    source_updated_at TIMESTAMP,
-    ingested_at TIMESTAMP,
+    source_updated_at TIMESTAMPTZ,
+    ingested_at TIMESTAMPTZ,
     UNIQUE (coin_id, source_updated_at)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crypto_coin_time
