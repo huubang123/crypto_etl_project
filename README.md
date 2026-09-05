@@ -101,6 +101,32 @@ Các unit test dùng mock cho API CoinGecko và DataFrame mẫu, vì vậy khôn
 python -m pytest -q
 ```
 
+## Chạy Với Airflow Và Docker
+
+Docker Compose tạo hai PostgreSQL tách biệt: một database metadata cho Airflow và một database đích cho ETL. Database đích tự chạy các file trong `sql/` ở lần khởi tạo đầu tiên.
+
+Tạo file cấu hình từ mẫu và điền ít nhất `DB_PASSWORD` (và `COINGECKO_API_KEY` nếu có):
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Khởi tạo Airflow, build image và chạy scheduler/webserver:
+
+```powershell
+docker compose up airflow-init
+docker compose up -d
+```
+
+Mở `http://localhost:8080`, đăng nhập bằng `admin` / `admin`, rồi bật DAG `crypto_etl_hourly`. DAG chạy mỗi giờ; để chạy thử ngay trong giao diện, chọn DAG và bấm Trigger DAG. Đổi `AIRFLOW_ADMIN_USERNAME` và `AIRFLOW_ADMIN_PASSWORD` trong `.env` trước khi dùng ngoài môi trường local.
+
+Xem log scheduler hoặc dừng dịch vụ:
+
+```powershell
+docker compose logs -f airflow-scheduler
+docker compose down
+```
+
 ## Cấu trúc Thư mục
 
 ```text
