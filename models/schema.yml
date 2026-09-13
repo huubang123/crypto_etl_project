@@ -1,0 +1,38 @@
+version: 2
+
+sources:
+  - name: crypto
+    database: "{{ env_var('DB_NAME', 'crypto_db') }}"
+    schema: crypto
+    tables:
+      - name: crypto_market_raw
+        columns:
+          - name: coin_id
+            tests:
+              - not_null
+          - name: source_updated_at
+            tests:
+              - not_null
+
+models:
+  - name: stg_crypto_market
+    columns:
+      - name: coin_id
+        tests:
+          - not_null
+          - unique
+      - name: source_updated_at
+        tests:
+          - not_null
+      - name: current_price
+        tests:
+          - not_null
+
+  - name: crypto_market_snapshot
+    columns:
+      - name: coin_id
+        tests:
+          - not_null
+      - name: source_updated_at
+        tests:
+          - not_null

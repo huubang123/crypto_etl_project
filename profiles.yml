@@ -1,0 +1,14 @@
+crypto_etl:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: postgres
+      pass: "{{ env_var('DB_PASSWORD') }}"
+      dbname: "{{ env_var('DB_NAME', 'crypto_db') }}"
+      schema: crypto
+      threads: 1
+      keepalives_idle: 0
+      sslmode: prefer
